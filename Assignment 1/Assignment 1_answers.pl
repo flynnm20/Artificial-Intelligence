@@ -1,0 +1,34 @@
+:- dynamic(kb/1).
+makeKB(File):- open(File,read,Str),readK(Str,K),reformat(K,KB),
+                asserta(kb(KB)),close(Str).
+
+readK(Stream,[]):- at_end_of_stream(Stream),!.
+readK(Stream,[X|L]):- read(Stream,X), readK(Stream,L).
+
+reformat([],[]).
+reformat([end_of_file],[]) :- !.
+
+reformat([:-(H,B)|L],[[H|BL]|R]) :- !,mkList(B,BL),reformat(L,R).
+
+reformat([A|L],[[A]|R]) :- reformat(L,R).
+mkList((X,T),[X|R]) :- !, mkList(T,R).
+mkList(X,[X]).
+initKB(File) :- retractall(kb(_)), makeKB(File).
+
+%start_actual_code
+astar(Node,Path,Cost) :- kb(KB), astarCompute(Node,Path,Cost,KB). %start_Computing
+astarCompute([[Node, Path, Cost]|_], [Node,Path], Cost, _) :- goal(Node). %check_If_We_Have_A_Goal
+astarCompute([[Node, P, C]|Rest], Path, Cost, KB) :- findall([X,[Node|P],Sum], (arc(Node, X, Y, KB), Sum is Y+C), Children),addtofrontier(Children, Rest, Temp), %get_next_Frontier
+													minSort(Temp, [[N1, P1, C1]|T1]), astarCompute([[N1, P1, C1]|T1], Path, Cost, KB). %get_Min_path_and_recurse
+
+%append_to_frontier
+addtofrontier(Children, Frontier, NewFrontier) :- append(Children, Frontier, NewFrontier).
+
+minSort([Head|Tail], Result) :- sort(Head, [], Tail, Result).
+sort(Head, S, [], [Head|S]).
+sort(C, S, [Head|Tail], Result) :- lessthan(C, Head), !, sort(C, [Head|S], Tail, Result); sort(Head, [C|S], Tail, Result).
+lessthan([Node1,_,Cost1|_],[Node2,_,Cost2|_]) :- heuristic(Node1,Hval1),heuristic(Node2,Hval2), F1 is Cost1+Hval1, F2 is Cost2+Hval2, F1 =< F2.
+
+arc([H|T],Node,Cost,KB) :- member([H|B],KB), append(B,T,Node), length(B,L), Cost is L+1. %take_the_exact_cost_for_heuristic
+heuristic(Node, H) :- length(Node, H).
+goal([]).
